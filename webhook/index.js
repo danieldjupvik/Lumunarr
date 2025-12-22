@@ -387,36 +387,22 @@ async function getChildren(types, roomName, uid, ip, key) {
 
 /**
  * Captures a specific light attribute and adds it to the action object if present.
- * Checks both direct property access and nested 'status' object (common in Hue V2 API).
+ * Uses confirmed API v2 paths (status object for effects, direct for others).
  *
  * @param {Object} light - The source light object from Hue API.
  * @param {Object} action - The target action object to be sent to the Bridge.
- * @param {string} parentKey - The parent property key (e.g., "effects", "effects_v2").
+ * @param {string} parentKey - The parent property key (e.g., "effects_v2", "color_temperature").
  * @param {string} childKey - The child property key (e.g., "effect", "mirek").
  * @param {string} logLabel - Human-readable label for logging.
  */
 function captureLightAttribute(light, action, parentKey, childKey, logLabel) {
-  // DEBUG: Log the raw structure to help identify the correct API path
-  if (light[parentKey]) {
-    console.info(
-      `[DEBUG_STRUCTURE] ${logLabel} found on light ${
-        light.metadata?.name || light.id
-      }: ${JSON.stringify(light[parentKey])}`
-    );
-  }
+  let value;
 
-  // Try direct access first (e.g., light.effects.effect)
-  let value = light[parentKey]?.[childKey];
-
-  // If not found, try nested status object (e.g., light.effects.status.effect)
-  if (value === undefined) {
+  // Resolve value based on known API structure
+  if (parentKey === "effects_v2") {
     value = light[parentKey]?.status?.[childKey];
-  }
-
-  // Special case for legacy effects object where the value might be directly on 'status'
-  // e.g. light.effects.status = "no_effect" vs light.effects.effect = "candle"
-  if (value === undefined && parentKey === "effects" && childKey === "effect") {
-    value = light[parentKey]?.status;
+  } else {
+    value = light[parentKey]?.[childKey];
   }
 
   if (value && value !== NO_EFFECT) {
@@ -518,21 +504,20 @@ async function createScene(types, roomName, ip, key, transition) {
       action.action.dimming = { brightness: light.dimming?.brightness || 0 };
     }
 
-    if (light.color) {
-      action.action.color = {
-        xy: {
-          x: light.color?.xy?.x || 0,
-          y: light.color?.xy?.y || 0,
-        },
-      };
-    }
+    const effectCaptured = captureLightAttribute(light, action, "effects_v2", "effect", "Effect V2");
 
-    captureLightAttribute(light, action, "color_temperature", "mirek", "Color Temperature");
-    
-    // Prioritize V2 effects; if captured, skip legacy effects to avoid conflicts
-    const v2Captured = captureLightAttribute(light, action, "effects_v2", "effect", "Effect V2");
-    if (!v2Captured) {
-      captureLightAttribute(light, action, "effects", "effect", "Effect");
+    // Only add static color/temperature if NO effect is active
+    if (!effectCaptured) {
+      if (light.color) {
+        action.action.color = {
+          xy: {
+            x: light.color?.xy?.x || 0,
+            y: light.color?.xy?.y || 0,
+          },
+        };
+      }
+
+      captureLightAttribute(light, action, "color_temperature", "mirek", "Color Temperature");
     }
 
     return action;
