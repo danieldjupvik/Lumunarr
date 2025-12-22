@@ -423,11 +423,24 @@ function captureLightAttribute(light, action, parentKey, childKey, logLabel) {
     if (!action.action[parentKey]) {
       action.action[parentKey] = {};
     }
-    action.action[parentKey][childKey] = value;
+
+    // Special write path for effects_v2: requires { action: { effect: "..." } }
+    if (parentKey === "effects_v2") {
+      if (!action.action[parentKey].action) {
+        action.action[parentKey].action = {};
+      }
+      action.action[parentKey].action[childKey] = value;
+    } else {
+      // Standard write path for others (effects, color_temperature)
+      action.action[parentKey][childKey] = value;
+    }
+
     console.info(
       `[Restore] Captured ${logLabel} for light ${light.metadata?.name || light.id}: ${value}`
     );
+    return true;
   }
+  return false;
 }
 
 async function createScene(types, roomName, ip, key, transition) {
