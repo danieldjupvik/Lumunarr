@@ -25,6 +25,8 @@ let colors = [
 
 var playStorage = [];
 
+const NO_EFFECT = "no_effect";
+
 const httpsAgent = new https.Agent({
   rejectUnauthorized: false,
 });
@@ -383,6 +385,51 @@ async function getChildren(types, roomName, uid, ip, key) {
   return children;
 }
 
+/**
+ * Captures a specific light attribute and adds it to the action object if present.
+ * Checks both direct property access and nested 'status' object (common in Hue V2 API).
+ *
+ * @param {Object} light - The source light object from Hue API.
+ * @param {Object} action - The target action object to be sent to the Bridge.
+ * @param {string} parentKey - The parent property key (e.g., "effects", "effects_v2").
+ * @param {string} childKey - The child property key (e.g., "effect", "mirek").
+ * @param {string} logLabel - Human-readable label for logging.
+ */
+function captureLightAttribute(light, action, parentKey, childKey, logLabel) {
+  // DEBUG: Log the raw structure to help identify the correct API path
+  if (light[parentKey]) {
+    console.info(
+      `[DEBUG_STRUCTURE] ${logLabel} found on light ${
+        light.metadata?.name || light.id
+      }: ${JSON.stringify(light[parentKey])}`
+    );
+  }
+
+  // Try direct access first (e.g., light.effects.effect)
+  let value = light[parentKey]?.[childKey];
+
+  // If not found, try nested status object (e.g., light.effects.status.effect)
+  if (value === undefined) {
+    value = light[parentKey]?.status?.[childKey];
+  }
+
+  // Special case for legacy effects object where the value might be directly on 'status'
+  // e.g. light.effects.status = "no_effect" vs light.effects.effect = "candle"
+  if (value === undefined && parentKey === "effects" && childKey === "effect") {
+    value = light[parentKey]?.status;
+  }
+
+  if (value && value !== NO_EFFECT) {
+    if (!action.action[parentKey]) {
+      action.action[parentKey] = {};
+    }
+    action.action[parentKey][childKey] = value;
+    console.info(
+      `[Restore] Captured ${logLabel} for light ${light.metadata?.name || light.id}: ${value}`
+    );
+  }
+}
+
 async function createScene(types, roomName, ip, key, transition) {
   const url = `https://${ip}/clip/v2/resource/scene`;
   var originalScene = {};
@@ -466,6 +513,11 @@ async function createScene(types, roomName, ip, key, transition) {
         },
       };
     }
+
+    captureLightAttribute(light, action, "color_temperature", "mirek", "Color Temperature");
+    captureLightAttribute(light, action, "effects", "effect", "Effect");
+    captureLightAttribute(light, action, "effects_v2", "effect", "Effect V2");
+
     return action;
   });
 
