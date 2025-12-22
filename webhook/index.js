@@ -515,8 +515,12 @@ async function createScene(types, roomName, ip, key, transition) {
     }
 
     captureLightAttribute(light, action, "color_temperature", "mirek", "Color Temperature");
-    captureLightAttribute(light, action, "effects", "effect", "Effect");
-    captureLightAttribute(light, action, "effects_v2", "effect", "Effect V2");
+    
+    // Prioritize V2 effects; if captured, skip legacy effects to avoid conflicts
+    const v2Captured = captureLightAttribute(light, action, "effects_v2", "effect", "Effect V2");
+    if (!v2Captured) {
+      captureLightAttribute(light, action, "effects", "effect", "Effect");
+    }
 
     return action;
   });
@@ -567,6 +571,11 @@ async function createScene(types, roomName, ip, key, transition) {
 
 async function deleteScene(roomName, transition, ip, key) {
   const roomId = playStorage.find((room) => room.room === roomName);
+
+  if (!roomId) {
+    console.warn(`[Restore] No scene found to delete for room: ${roomName}`);
+    return;
+  }
 
   setScene(roomId.rid, transition, ip, key);
 
