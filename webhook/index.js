@@ -25,6 +25,8 @@ let colors = [
 
 var playStorage = [];
 
+const NO_EFFECT = "no_effect";
+
 const httpsAgent = new https.Agent({
   rejectUnauthorized: false,
 });
@@ -383,6 +385,19 @@ async function getChildren(types, roomName, uid, ip, key) {
   return children;
 }
 
+function captureLightAttribute(light, action, parentKey, childKey, logLabel) {
+  const value = light[parentKey]?.[childKey];
+  if (value && value !== NO_EFFECT) {
+    if (!action.action[parentKey]) {
+      action.action[parentKey] = {};
+    }
+    action.action[parentKey][childKey] = value;
+    console.info(
+      `[Restore] Captured ${logLabel} for light ${light.metadata?.name || light.id}: ${value}`
+    );
+  }
+}
+
 async function createScene(types, roomName, ip, key, transition) {
   const url = `https://${ip}/clip/v2/resource/scene`;
   var originalScene = {};
@@ -467,22 +482,9 @@ async function createScene(types, roomName, ip, key, transition) {
       };
     }
 
-    const captureLightAttribute = (parentKey, childKey, logLabel) => {
-      const value = light[parentKey]?.[childKey];
-      if (value && value !== "no_effect") {
-        if (!action.action[parentKey]) {
-          action.action[parentKey] = {};
-        }
-        action.action[parentKey][childKey] = value;
-        console.info(
-          `[Restore] Captured ${logLabel} for light ${light.metadata?.name || light.id}: ${value}`
-        );
-      }
-    };
-
-    captureLightAttribute("color_temperature", "mirek", "Color Temperature");
-    captureLightAttribute("effects", "effect", "Effect");
-    captureLightAttribute("effects_v2", "effect", "Effect V2");
+    captureLightAttribute(light, action, "color_temperature", "mirek", "Color Temperature");
+    captureLightAttribute(light, action, "effects", "effect", "Effect");
+    captureLightAttribute(light, action, "effects_v2", "effect", "Effect V2");
 
     return action;
   });
