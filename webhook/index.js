@@ -391,32 +391,17 @@ async function getChildren(types, roomName, uid, ip, key) {
  *
  * @param {Object} light - The source light object from Hue API.
  * @param {Object} action - The target action object to be sent to the Bridge.
- * @param {string} parentKey - The parent property key (e.g., "effects", "effects_v2").
+ * @param {string} parentKey - The parent property key (e.g., "effects_v2", "color_temperature").
  * @param {string} childKey - The child property key (e.g., "effect", "mirek").
  * @param {string} logLabel - Human-readable label for logging.
  */
 function captureLightAttribute(light, action, parentKey, childKey, logLabel) {
-  // DEBUG: Log the raw structure to help identify the correct API path
-  if (light[parentKey]) {
-    console.info(
-      `[DEBUG_STRUCTURE] ${logLabel} found on light ${
-        light.metadata?.name || light.id
-      }: ${JSON.stringify(light[parentKey])}`
-    );
-  }
-
-  // Try direct access first (e.g., light.effects.effect)
+  // Try direct access first (e.g., light.effects_v2.effect)
   let value = light[parentKey]?.[childKey];
 
-  // If not found, try nested status object (e.g., light.effects.status.effect)
+  // If not found, try nested status object (e.g., light.effects_v2.status.effect)
   if (value === undefined) {
     value = light[parentKey]?.status?.[childKey];
-  }
-
-  // Special case for legacy effects object where the value might be directly on 'status'
-  // e.g. light.effects.status = "no_effect" vs light.effects.effect = "candle"
-  if (value === undefined && parentKey === "effects" && childKey === "effect") {
-    value = light[parentKey]?.status;
   }
 
   if (value && value !== NO_EFFECT) {
@@ -431,7 +416,7 @@ function captureLightAttribute(light, action, parentKey, childKey, logLabel) {
       }
       action.action[parentKey].action[childKey] = value;
     } else {
-      // Standard write path for others (effects, color_temperature)
+      // Standard write path for color_temperature, etc.
       action.action[parentKey][childKey] = value;
     }
 
@@ -528,11 +513,15 @@ async function createScene(types, roomName, ip, key, transition) {
     }
 
     captureLightAttribute(light, action, "color_temperature", "mirek", "Color Temperature");
-    
-    // Prioritize V2 effects; if captured, skip legacy effects to avoid conflicts
-    const v2Captured = captureLightAttribute(light, action, "effects_v2", "effect", "Effect V2");
-    if (!v2Captured) {
-      captureLightAttribute(light, action, "effects", "effect", "Effect");
+
+    // Capture effects_v2 (legacy 'effects' is deprecated per Hue API docs)
+    const effectCaptured = captureLightAttribute(light, action, "effects_v2", "effect", "Effect");
+
+    // CRITICAL: If an effect is active, we MUST remove static color/temperature instructions.
+    // The Hue API forbids combining effects with 'color' or 'color_temperature' in the same action.
+    if (effectCaptured) {
+      delete action.action.color;
+      delete action.action.color_temperature;
     }
 
     return action;
