@@ -1561,6 +1561,12 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                 } else {
                                   if (client.pause === "-2") {
                                     const roomId = playStorage.find((room) => room.room === client.room);
+
+                                    if (!roomId) {
+                                      console.warn(`[Restore] No scene found for room: ${client.room}`);
+                                      return;
+                                    }
+
                                     setScene(
                                       roomId.rid,
                                       parseFloat(client.transition) * 1000,
@@ -1589,6 +1595,12 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                 } else {
                                   if (client.pause === "-2") {
                                     const roomId = playStorage.find((room) => room.room === client.room);
+
+                                    if (!roomId) {
+                                      console.warn(`[Restore] No scene found for room: ${client.room}`);
+                                      return;
+                                    }
+
                                     setScene(
                                       roomId.rid,
                                       parseFloat(global.transition) * 1000,
