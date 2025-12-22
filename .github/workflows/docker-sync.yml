@@ -3,7 +3,15 @@ name: Docker Build and Publish
 on:
   push:
     branches:
-      - master
+      - develop
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.dockerignore'
+      - 'docs/**'
+  pull_request:
+    branches:
       - develop
     paths-ignore:
       - '**.md'
@@ -22,6 +30,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      pull-requests: read
 
     steps:
       - name: Checkout repository
@@ -52,12 +61,16 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
-            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+            # latest and develop tags for develop branch pushes
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
+            type=raw,value=develop,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
+            # PR builds get pr-<number> tag
+            type=ref,event=pr
+            # SHA tag for all builds
             type=sha,prefix=sha-
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
@@ -66,3 +79,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Enable BuildKit inline cache for better layer caching
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
