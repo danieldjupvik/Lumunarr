@@ -25,6 +25,8 @@ let colors = [
 
 var playStorage = [];
 
+const NO_EFFECT = "no_effect";
+
 const httpsAgent = new https.Agent({
   rejectUnauthorized: false,
 });
@@ -383,6 +385,73 @@ async function getChildren(types, roomName, uid, ip, key) {
   return children;
 }
 
+/**
+ * Structure of the Hue API v2 'effects_v2' object (Status).
+ * Based on Hue Developer Portal documentation.
+ *
+ * @typedef {Object} HueEffectsV2Status
+ * @property {string} effect - The active effect (e.g., 'opal', 'fire', 'prism', 'no_effect').
+ * @property {string[]} effect_values - Array of supported effects.
+ * @property {Object} [parameters] - Customization parameters for the effect.
+ * @property {number} [parameters.speed] - Speed of the effect (0.0 - 1.0).
+ * @property {Object} [parameters.color] - Color definition.
+ * @property {Object} [parameters.color.xy] - CIE XY coordinates.
+ * @property {number} parameters.color.xy.x - X coordinate (0.0 - 1.0).
+ * @property {number} parameters.color.xy.y - Y coordinate (0.0 - 1.0).
+ * @property {Object} [parameters.color_temperature] - Color temperature definition.
+ * @property {number} [parameters.color_temperature.mirek] - Mirek value (50 - 1000).
+ * @property {boolean} [parameters.color_temperature.mirek_valid] - Validity of mirek value.
+ */
+
+/**
+ * Captures a specific light attribute and adds it to the action object if present.
+ * Uses confirmed API v2 paths (status object for effects, direct for others).
+ *
+ * @param {Object} light - The source light object from Hue API.
+ * @param {Object} action - The target action object to be sent to the Bridge.
+ * @param {string} parentKey - The parent property key (e.g., "effects_v2", "color_temperature").
+ * @param {string} childKey - The child property key (e.g., "effect", "mirek").
+ * @param {string} logLabel - Human-readable label for logging.
+ */
+function captureLightAttribute(light, action, parentKey, childKey, logLabel) {
+  let value;
+  
+  if (parentKey === "effects_v2") {
+    value = light[parentKey]?.status?.[childKey];
+  } else {
+    value = light[parentKey]?.[childKey];
+  }
+
+  if (value && value !== NO_EFFECT) {
+    if (!action.action[parentKey]) {
+      action.action[parentKey] = {};
+    }
+
+    // Special write path for effects_v2: requires { action: { effect: "..." } }
+    if (parentKey === "effects_v2") {
+      if (!action.action[parentKey].action) {
+        action.action[parentKey].action = {};
+      }
+      action.action[parentKey].action[childKey] = value;
+
+      // Capture optional parameters (speed, color variants) if present in status
+      const parameters = light[parentKey]?.status?.parameters;
+      if (parameters) {
+        action.action[parentKey].action.parameters = parameters;
+      }
+    } else {
+      // Standard write path for others (effects, color_temperature)
+      action.action[parentKey][childKey] = value;
+    }
+
+    console.info(
+      `[Restore] Captured ${logLabel} for light ${light.metadata?.name || light.id}: ${value}`
+    );
+    return true;
+  }
+  return false;
+}
+
 async function createScene(types, roomName, ip, key, transition) {
   const url = `https://${ip}/clip/v2/resource/scene`;
   var originalScene = {};
@@ -458,14 +527,22 @@ async function createScene(types, roomName, ip, key, transition) {
       action.action.dimming = { brightness: light.dimming?.brightness || 0 };
     }
 
-    if (light.color) {
-      action.action.color = {
-        xy: {
-          x: light.color?.xy?.x || 0,
-          y: light.color?.xy?.y || 0,
-        },
-      };
+    const effectCaptured = captureLightAttribute(light, action, "effects_v2", "effect", "Effect V2");
+
+    // Only add static color/temperature if NO effect is active
+    if (!effectCaptured) {
+      if (light.color && light.color.xy) {
+        action.action.color = {
+          xy: {
+            x: light.color.xy.x,
+            y: light.color.xy.y,
+          },
+        };
+      }
+
+      captureLightAttribute(light, action, "color_temperature", "mirek", "Color Temperature");
     }
+
     return action;
   });
 
@@ -515,6 +592,11 @@ async function createScene(types, roomName, ip, key, transition) {
 
 async function deleteScene(roomName, transition, ip, key) {
   const roomId = playStorage.find((room) => room.room === roomName);
+
+  if (!roomId) {
+    console.warn(`[Restore] No scene found to delete for room: ${roomName}`);
+    return;
+  }
 
   setScene(roomId.rid, transition, ip, key);
 
@@ -1487,6 +1569,12 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                 } else {
                                   if (client.pause === "-2") {
                                     const roomId = playStorage.find((room) => room.room === client.room);
+
+                                    if (!roomId) {
+                                      console.warn(`[Restore] No scene found for room: ${client.room}`);
+                                      return;
+                                    }
+
                                     setScene(
                                       roomId.rid,
                                       parseFloat(client.transition) * 1000,
@@ -1515,6 +1603,12 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                 } else {
                                   if (client.pause === "-2") {
                                     const roomId = playStorage.find((room) => room.room === client.room);
+
+                                    if (!roomId) {
+                                      console.warn(`[Restore] No scene found for room: ${client.room}`);
+                                      return;
+                                    }
+
                                     setScene(
                                       roomId.rid,
                                       parseFloat(global.transition) * 1000,
