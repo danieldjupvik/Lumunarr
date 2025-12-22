@@ -508,11 +508,11 @@ async function createScene(types, roomName, ip, key, transition) {
 
     // Only add static color/temperature if NO effect is active
     if (!effectCaptured) {
-      if (light.color) {
+      if (light.color && light.color.xy) {
         action.action.color = {
           xy: {
-            x: light.color?.xy?.x || 0,
-            y: light.color?.xy?.y || 0,
+            x: light.color.xy.x,
+            y: light.color.xy.y,
           },
         };
       }
