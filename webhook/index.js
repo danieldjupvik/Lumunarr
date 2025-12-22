@@ -467,37 +467,22 @@ async function createScene(types, roomName, ip, key, transition) {
       };
     }
 
-    if (light.color_temperature && light.color_temperature.mirek) {
-      if (!action.action.color_temperature) {
-        action.action.color_temperature = {};
+    const captureLightAttribute = (parentKey, childKey, logLabel) => {
+      const value = light[parentKey]?.[childKey];
+      if (value && value !== "no_effect") {
+        if (!action.action[parentKey]) {
+          action.action[parentKey] = {};
+        }
+        action.action[parentKey][childKey] = value;
+        console.info(
+          `[Restore] Captured ${logLabel} for light ${light.metadata?.name || light.id}: ${value}`
+        );
       }
-      action.action.color_temperature.mirek = light.color_temperature.mirek;
-      console.info(
-        `[Restore] Captured Color Temperature for light ${light.metadata?.name || light.id}: ${
-          light.color_temperature.mirek
-        }`
-      );
-    }
+    };
 
-    if (light.effects && light.effects.effect && light.effects.effect !== "no_effect") {
-      if (!action.action.effects) {
-        action.action.effects = {};
-      }
-      action.action.effects.effect = light.effects.effect;
-      console.info(
-        `[Restore] Captured Effect for light ${light.metadata?.name || light.id}: ${light.effects.effect}`
-      );
-    }
-
-    if (light.effects_v2 && light.effects_v2.effect && light.effects_v2.effect !== "no_effect") {
-      if (!action.action.effects_v2) {
-        action.action.effects_v2 = {};
-      }
-      action.action.effects_v2.effect = light.effects_v2.effect;
-      console.info(
-        `[Restore] Captured Effect V2 for light ${light.metadata?.name || light.id}: ${light.effects_v2.effect}`
-      );
-    }
+    captureLightAttribute("color_temperature", "mirek", "Color Temperature");
+    captureLightAttribute("effects", "effect", "Effect");
+    captureLightAttribute("effects_v2", "effect", "Effect V2");
 
     return action;
   });
