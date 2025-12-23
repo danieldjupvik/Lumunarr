@@ -35,14 +35,12 @@ COPY app.js ./
 COPY bin ./bin
 COPY backend ./backend
 COPY webhook ./webhook
+COPY version.json ./
 
 # Copy frontend router (needed at runtime)
 COPY frontend/index.js ./frontend/
 
 # Copy built frontend from builder stage
 COPY --from=frontend-builder /app/frontend/production ./frontend/production
-
-# Use non-root user for security
-USER node
 
 ENTRYPOINT ["node", "./bin/www"]
