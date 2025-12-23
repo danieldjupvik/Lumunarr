@@ -1,17 +1,48 @@
-FROM node:18.15.0-slim
+# Stage 1: Build frontend
+FROM node:18.15.0-slim AS frontend-builder
+
+WORKDIR /app/frontend
+
+# Copy frontend package files first (for dependency caching)
+COPY frontend/package.json frontend/package-lock.json ./
+
+# Install frontend dependencies (cached if package files don't change)
+RUN npm ci
+
+# Copy frontend source code
+COPY frontend/src ./src
+COPY frontend/public ./public
+
+# Build frontend
+RUN npm run build
+
+# Stage 2: Build backend and final image
+FROM node:18.15.0-slim AS production
 
 ARG BUILD
-
 ENV BUILD=${BUILD}
-
-COPY . /Lumunarr
-
-WORKDIR /Lumunarr/frontend
-
-RUN npm ci && npm run build
 
 WORKDIR /Lumunarr
 
-RUN npm ci
+# Copy backend package files first (for dependency caching)
+COPY package.json package-lock.json ./
 
-ENTRYPOINT ["npm", "start"]
+# Install backend dependencies (cached if package files don't change)
+RUN npm ci --omit=dev
+
+# Copy backend source code
+COPY app.js ./
+COPY bin ./bin
+COPY backend ./backend
+COPY webhook ./webhook
+
+# Copy frontend router (needed at runtime)
+COPY frontend/index.js ./frontend/
+
+# Copy built frontend from builder stage
+COPY --from=frontend-builder /app/frontend/production ./frontend/production
+
+# Use non-root user for security
+USER node
+
+ENTRYPOINT ["node", "./bin/www"]

@@ -1,1 +1,36 @@
+# Dependencies
 node_modules
+frontend/node_modules
+
+# Build artifacts (we build fresh in Docker)
+frontend/production
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Documentation
+*.md
+docs
+LICENSE
+
+# CI/CD
+.github
+Jenkinsfile
+
+# Development files
+.env
+.env.*
+*.log
+
+# Test files
+**/*.test.js
+**/*.spec.js
+**/setupTests.js
+**/reportWebVitals.js
