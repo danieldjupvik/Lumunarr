@@ -2,7 +2,6 @@ var express = require("express");
 var router = express.Router();
 var axios = require("axios").default;
 var parser = require("xml-js");
-var fs = require("fs");
 var utils = require("./utils");
 
 router.post("/", async function (req, res, next) {

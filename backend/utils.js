@@ -1,7 +1,7 @@
-var fs = require("fs");
+const fs = require("fs");
 
 var getPlexDomain = function() {
-  return new Promise(function(resolve, reject) {
+  return new Promise(function(resolve) {
     var domain = process.env.PLEX_DOMAIN_OVERRIDE || "plex.tv";
     
     fs.readFile("/config/settings.js", "utf8", function(err, fileData) {
@@ -11,8 +11,8 @@ var getPlexDomain = function() {
           if (settings.settings && settings.settings.plexDomain && settings.settings.plexDomain.trim() !== "") {
             domain = settings.settings.plexDomain.trim();
           }
-        } catch (err) {
-          console.error("Error parsing settings for Plex Domain:", err);
+        } catch (parseErr) {
+          console.error("Error parsing settings for Plex Domain:", parseErr);
         }
       }
       resolve(domain);

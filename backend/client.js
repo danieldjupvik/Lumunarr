@@ -3,7 +3,6 @@ var router = express.Router();
 var axios = require("axios").default;
 var https = require("https");
 var parser = require("xml-js");
-var fs = require("fs");
 var utils = require("./utils");
 
 const httpsAgent = new https.Agent({
