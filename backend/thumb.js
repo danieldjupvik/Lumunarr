@@ -2,9 +2,27 @@ var express = require("express");
 var router = express.Router();
 var axios = require("axios").default;
 var parser = require("xml-js");
+var fs = require("fs");
+
+function getPlexDomain() {
+  var domain = process.env.PLEX_DOMAIN_OVERRIDE || "plex.tv";
+  try {
+    if (fs.existsSync("/config/settings.js")) {
+      var fileData = fs.readFileSync("/config/settings.js");
+      var settings = JSON.parse(fileData);
+      if (settings.settings && settings.settings.plexDomain && settings.settings.plexDomain.trim() !== "") {
+        domain = settings.settings.plexDomain.trim();
+      }
+    }
+  } catch (err) {
+    console.error("Error reading settings for Plex Domain:", err);
+  }
+  return domain;
+}
 
 router.post("/", async function (req, res, next) {
-  var url = "https://plex.tv/users/account";
+  var PLEX_DOMAIN = getPlexDomain();
+  var url = `https://${PLEX_DOMAIN}/users/account`;
 
   await axios
     .get(url, { params: { "X-Plex-Token": req.body.token } })

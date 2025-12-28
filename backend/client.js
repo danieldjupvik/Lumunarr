@@ -3,10 +3,27 @@ var router = express.Router();
 var axios = require("axios").default;
 var https = require("https");
 var parser = require("xml-js");
+var fs = require("fs");
 
 const httpsAgent = new https.Agent({
   rejectUnauthorized: false,
 });
+
+function getPlexDomain() {
+  var domain = process.env.PLEX_DOMAIN_OVERRIDE || "plex.tv";
+  try {
+    if (fs.existsSync("/config/settings.js")) {
+      var fileData = fs.readFileSync("/config/settings.js");
+      var settings = JSON.parse(fileData);
+      if (settings.settings && settings.settings.plexDomain && settings.settings.plexDomain.trim() !== "") {
+        domain = settings.settings.plexDomain.trim();
+      }
+    }
+  } catch (err) {
+    console.error("Error reading settings for Plex Domain:", err);
+  }
+  return domain;
+}
 
 router.post("/", async function (req, res, next) {
   var rooms = {};
@@ -19,7 +36,9 @@ router.post("/", async function (req, res, next) {
   var libraries = [];
   var unauth = false;
 
-  console.info("Retrieving information for Plex Clients...");
+  var PLEX_DOMAIN = getPlexDomain();
+
+  console.info(`Retrieving information for Plex Clients (using domain: ${PLEX_DOMAIN})...`);
 
   var url = `https://${req.body.bridge.ip}/clip/v2/resource/room`;
 
@@ -166,7 +185,7 @@ router.post("/", async function (req, res, next) {
       message.push("Could not connect to the Hue bridge while requesting smart scenes");
     });
 
-  var url = "https://plex.tv/api/users";
+  var url = `https://${PLEX_DOMAIN}/api/users`;
 
   await axios
     .get(url, { timeout: 10000, params: { "X-Plex-Token": req.body.token } })
@@ -192,7 +211,7 @@ router.post("/", async function (req, res, next) {
       message.push("Issue with connection to online Plex account while requesting friends. Check logs for reason.");
     });
 
-  var url = "https://plex.tv/users/account";
+  var url = `https://${PLEX_DOMAIN}/users/account`;
 
   await axios
     .get(url, { timeout: 10000, params: { "X-Plex-Token": req.body.token } })
@@ -220,7 +239,7 @@ router.post("/", async function (req, res, next) {
       );
     });
 
-  var url = "https://plex.tv/api/servers";
+  var url = `https://${PLEX_DOMAIN}/api/servers`;
 
   await axios
     .get(url, { timeout: 10000, params: { "X-Plex-Token": req.body.token } })
@@ -234,7 +253,7 @@ router.post("/", async function (req, res, next) {
 
       servers.forEach(async (server) => {
         if (server._attributes.owned === "1") {
-          var url = `https://plex.tv/api/servers/${server._attributes.machineIdentifier}`;
+          var url = `https://${PLEX_DOMAIN}/api/servers/${server._attributes.machineIdentifier}`;
           await axios
             .get(url, { timeout: 10000, params: { "X-Plex-Token": req.body.token } })
             .then(function (response) {
@@ -263,7 +282,7 @@ router.post("/", async function (req, res, next) {
       message.push("Issue with connection to online Plex account while requesting servers. Check logs for reason.");
     });
 
-  var url = "https://plex.tv/devices.xml";
+  var url = `https://${PLEX_DOMAIN}/devices.xml`;
 
   await axios
     .get(url, { timeout: 10000, params: { "X-Plex-Token": req.body.token } })
