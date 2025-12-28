@@ -3,25 +3,10 @@ var router = express.Router();
 var axios = require("axios").default;
 var parser = require("xml-js");
 var fs = require("fs");
-
-function getPlexDomain() {
-  var domain = process.env.PLEX_DOMAIN_OVERRIDE || "plex.tv";
-  try {
-    if (fs.existsSync("/config/settings.js")) {
-      var fileData = fs.readFileSync("/config/settings.js");
-      var settings = JSON.parse(fileData);
-      if (settings.settings && settings.settings.plexDomain && settings.settings.plexDomain.trim() !== "") {
-        domain = settings.settings.plexDomain.trim();
-      }
-    }
-  } catch (err) {
-    console.error("Error reading settings for Plex Domain:", err);
-  }
-  return domain;
-}
+var utils = require("./utils");
 
 router.post("/", async function (req, res, next) {
-  var PLEX_DOMAIN = getPlexDomain();
+  var PLEX_DOMAIN = await utils.getPlexDomain();
   var url = `https://${PLEX_DOMAIN}/users/account`;
 
   await axios
@@ -40,7 +25,7 @@ router.post("/", async function (req, res, next) {
     })
     .catch(function (error) {
       if (error.request) {
-        console.error("Could not connect to the Plex sewrver");
+        console.error("Could not connect to the Plex server");
         res.status(403).send("Could not connect to the Plex server");
       }
     });

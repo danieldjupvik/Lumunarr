@@ -4,26 +4,11 @@ var axios = require("axios").default;
 var https = require("https");
 var parser = require("xml-js");
 var fs = require("fs");
+var utils = require("./utils");
 
 const httpsAgent = new https.Agent({
   rejectUnauthorized: false,
 });
-
-function getPlexDomain() {
-  var domain = process.env.PLEX_DOMAIN_OVERRIDE || "plex.tv";
-  try {
-    if (fs.existsSync("/config/settings.js")) {
-      var fileData = fs.readFileSync("/config/settings.js");
-      var settings = JSON.parse(fileData);
-      if (settings.settings && settings.settings.plexDomain && settings.settings.plexDomain.trim() !== "") {
-        domain = settings.settings.plexDomain.trim();
-      }
-    }
-  } catch (err) {
-    console.error("Error reading settings for Plex Domain:", err);
-  }
-  return domain;
-}
 
 router.post("/", async function (req, res, next) {
   var rooms = {};
@@ -36,7 +21,7 @@ router.post("/", async function (req, res, next) {
   var libraries = [];
   var unauth = false;
 
-  var PLEX_DOMAIN = getPlexDomain();
+  var PLEX_DOMAIN = await utils.getPlexDomain();
 
   console.info(`Retrieving information for Plex Clients (using domain: ${PLEX_DOMAIN})...`);
 
