@@ -40,15 +40,15 @@ function isInSchedule(sh, sm, sd, eh, em, ed) {
       ? (startHour = 12)
       : (startHour = parseInt(sh) + 12)
     : parseInt(sh) === 12
-    ? (startHour = 0)
-    : (startHour = parseInt(sh));
+      ? (startHour = 0)
+      : (startHour = parseInt(sh));
   parseInt(ed) === 2
     ? parseInt(eh) === 12
       ? (endHour = 12)
       : (endHour = parseInt(eh) + 12)
     : parseInt(eh) === 12
-    ? (endHour = 0)
-    : (endHour = parseInt(eh));
+      ? (endHour = 0)
+      : (endHour = parseInt(eh));
   startMin = parseInt(sm);
   endMin = parseInt(em);
 
@@ -114,7 +114,7 @@ function setScene(scene, transition, ip, user) {
             "hue-application-key": `${user}`,
           },
           httpsAgent,
-        }
+        },
       )
       .then(function (response) {
         console.info(`Scene ${scene} recalled`);
@@ -134,7 +134,7 @@ function setScene(scene, transition, ip, user) {
                 "hue-application-key": `${user}`,
               },
               httpsAgent,
-            }
+            },
           )
           .then(function (response) {
             console.info(`Smart Scene ${scene} recalled`);
@@ -162,7 +162,7 @@ function setScene(scene, transition, ip, user) {
             "hue-application-key": `${user}`,
           },
           httpsAgent,
-        }
+        },
       )
       .then(function (response) {
         console.info(`Scene ${scene} recalled`);
@@ -181,7 +181,7 @@ function setScene(scene, transition, ip, user) {
                 "hue-application-key": `${user}`,
               },
               httpsAgent,
-            }
+            },
           )
           .then(function (response) {
             console.info(`Smart Scene ${scene} recalled`);
@@ -262,13 +262,13 @@ async function turnoffGroup(room, ip, user, transition) {
                   "hue-application-key": `${user}`,
                 },
                 httpsAgent,
-              }
+              },
             );
           }
         } catch (error) {
           console.error("GroupList (room):", error);
         }
-      })
+      }),
     );
 
     url = `https://${ip}/clip/v2/resource/zone`;
@@ -305,13 +305,13 @@ async function turnoffGroup(room, ip, user, transition) {
                   "hue-application-key": `${user}`,
                 },
                 httpsAgent,
-              }
+              },
             );
           }
         } catch (error) {
           console.error("GroupList (zone):", error);
         }
-      })
+      }),
     );
   } catch (error) {
     console.error("Unexpected error in turnoffGroup:", error);
@@ -426,6 +426,37 @@ function captureLightAttribute(light, action, parentKey, childKey) {
   }
 
   return true;
+}
+
+async function recallDanglingScene(roomName, ip, key) {
+  const url = `https://${ip}/clip/v2/resource/scene`;
+  var danglingScene = {};
+
+  await axios
+    .get(url, {
+      timeout: 5000,
+      headers: {
+        "Content-Type": "application/json;charset=UTF-8",
+        "hue-application-key": `${key}`,
+      },
+      httpsAgent,
+    })
+    .then((response) => {
+      const res = response.data.data;
+      danglingScene = res.find((scene) => scene.metadata.name === `Lumunarr ${roomName}`);
+    })
+    .catch((error) => {
+      if (error.response) {
+        console.error("Scene retrieval failed:");
+        console.error(`Status Code: ${error.response.status}`);
+        console.error(`Status Text: ${error.response.statusText}`);
+        console.error("Error Response Data:", JSON.stringify(error.response.data, null, 2));
+      } else {
+        console.error("Unknown error:", error.message);
+      }
+    });
+
+  return danglingScene ?? null;
 }
 
 async function createScene(types, roomName, ip, key, transition) {
@@ -543,7 +574,7 @@ async function createScene(types, roomName, ip, key, transition) {
           "hue-application-key": `${key}`,
         },
         httpsAgent,
-      }
+      },
     )
     .then((response) => {
       const res = response.data.data[0];
@@ -568,18 +599,20 @@ async function createScene(types, roomName, ip, key, transition) {
 }
 
 async function deleteScene(roomName, transition, ip, key) {
-  const roomId = playStorage.find((room) => room.room === roomName);
+  let parsedId;
+  let roomId = playStorage.find((room) => room.room === roomName);
 
-  if (!roomId) {
-    console.warn(`[Restore] No scene found to delete for room: ${roomName}`);
-    return;
+  if (roomId) {
+    parsedId = roomId.rid;
+    setScene(roomId.rid, transition, ip, key);
+  } else {
+    let tempId = await recallDanglingScene(roomName, ip, key);
+    parsedId = tempId.id;
   }
-
-  setScene(roomId.rid, transition, ip, key);
 
   await wait(200);
 
-  const url = `https://${ip}/clip/v2/resource/scene/${roomId.rid}`;
+  const url = `https://${ip}/clip/v2/resource/scene/${parsedId}`;
 
   await axios
     .delete(url, {
@@ -591,7 +624,7 @@ async function deleteScene(roomName, transition, ip, key) {
       httpsAgent,
     })
     .then((response) => {
-      console.info(`Scene ${roomId.rid} was removed`);
+      console.info(`Scene ${parsedId} was removed`);
     })
     .catch((error) => {
       if (error.response) {
@@ -637,7 +670,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                 server.startMed,
                 server.endHour,
                 server.endMin,
-                server.endMed
+                server.endMed,
               );
               break;
             case "2":
@@ -650,7 +683,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                 global.startMed,
                 global.endHour,
                 global.endMin,
-                global.endMed
+                global.endMed,
               );
               break;
             default:
@@ -681,7 +714,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                           "hue-application-key": `${settings.bridge.user}`,
                         },
                         httpsAgent,
-                      }
+                      },
                     )
                     .then(function (response) {
                       console.info(`...Playback started on server by ${payload.Account.title}`, response);
@@ -716,7 +749,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                           "hue-application-key": `${settings.bridge.user}`,
                         },
                         httpsAgent,
-                      }
+                      },
                     )
                     .then(function (response) {
                       console.info(`Playback started on server by ${payload.Account.title}`);
@@ -761,7 +794,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                             "hue-application-key": `${settings.bridge.user}`,
                           },
                           httpsAgent,
-                        }
+                        },
                       )
                       .catch(function (error) {
                         if (error.response && error.response.data && error.response.data.errors) {
@@ -795,7 +828,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                             "hue-application-key": `${settings.bridge.user}`,
                           },
                           httpsAgent,
-                        }
+                        },
                       )
                       .catch(function (error) {
                         if (error.response && error.response.data && error.response.data.errors) {
@@ -823,7 +856,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                           "hue-application-key": `${settings.bridge.user}`,
                         },
                         httpsAgent,
-                      }
+                      },
                     )
                     .catch(function (error) {
                       if (error.response && error.response.data && error.response.data.errors) {
@@ -856,7 +889,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                               "hue-application-key": `${settings.bridge.user}`,
                             },
                             httpsAgent,
-                          }
+                          },
                         )
                         .catch(function (error) {
                           if (error.response && error.response.data && error.response.data.errors) {
@@ -906,7 +939,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                             "hue-application-key": `${settings.bridge.user}`,
                           },
                           httpsAgent,
-                        }
+                        },
                       )
                       .catch(function (error) {
                         console.error(error.stack);
@@ -933,7 +966,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                             "hue-application-key": `${settings.bridge.user}`,
                           },
                           httpsAgent,
-                        }
+                        },
                       )
                       .catch(function (error) {
                         console.error(error.stack);
@@ -955,7 +988,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                           "hue-application-key": `${settings.bridge.user}`,
                         },
                         httpsAgent,
-                      }
+                      },
                     )
                     .catch(function (error) {
                       console.error(error.stack);
@@ -980,7 +1013,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                             "hue-application-key": `${settings.bridge.user}`,
                           },
                           httpsAgent,
-                        }
+                        },
                       )
                       .catch(function (error) {
                         console.error(error.stack);
@@ -1005,7 +1038,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                 server.startMed,
                 server.endHour,
                 server.endMin,
-                server.endMed
+                server.endMed,
               );
               break;
             case "2":
@@ -1018,7 +1051,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                 global.startMed,
                 global.endHour,
                 global.endMin,
-                global.endMed
+                global.endMed,
               );
               break;
             default:
@@ -1049,7 +1082,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                           "hue-application-key": `${settings.bridge.user}`,
                         },
                         httpsAgent,
-                      }
+                      },
                     )
                     .then(function (response) {
                       console.info("New media has been added to the Plex server");
@@ -1084,7 +1117,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                           "hue-application-key": `${settings.bridge.user}`,
                         },
                         httpsAgent,
-                      }
+                      },
                     )
                     .then(function (response) {
                       console.info(`New media has been added to the Plex server`);
@@ -1131,7 +1164,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                               "hue-application-key": `${settings.bridge.user}`,
                             },
                             httpsAgent,
-                          }
+                          },
                         )
                         .catch(function (error) {
                           if (error.response && error.response.data && error.response.data.errors) {
@@ -1165,7 +1198,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                               "hue-application-key": `${settings.bridge.user}`,
                             },
                             httpsAgent,
-                          }
+                          },
                         )
                         .catch(function (error) {
                           if (error.response && error.response.data && error.response.data.errors) {
@@ -1193,7 +1226,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                             "hue-application-key": `${settings.bridge.user}`,
                           },
                           httpsAgent,
-                        }
+                        },
                       )
                       .catch(function (error) {
                         if (error.response && error.response.data && error.response.data.errors) {
@@ -1226,7 +1259,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                 "hue-application-key": `${settings.bridge.user}`,
                               },
                               httpsAgent,
-                            }
+                            },
                           )
                           .catch(function (error) {
                             if (error.response && error.response.data && error.response.data.errors) {
@@ -1280,7 +1313,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                               "hue-application-key": `${settings.bridge.user}`,
                             },
                             httpsAgent,
-                          }
+                          },
                         )
                         .catch(function (error) {
                           console.error(error.stack);
@@ -1307,7 +1340,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                               "hue-application-key": `${settings.bridge.user}`,
                             },
                             httpsAgent,
-                          }
+                          },
                         )
                         .catch(function (error) {
                           console.error(error.stack);
@@ -1329,7 +1362,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                             "hue-application-key": `${settings.bridge.user}`,
                           },
                           httpsAgent,
-                        }
+                        },
                       )
                       .catch(function (error) {
                         console.error(error.stack);
@@ -1354,7 +1387,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                               "hue-application-key": `${settings.bridge.user}`,
                             },
                             httpsAgent,
-                          }
+                          },
                         )
                         .catch(function (error) {
                           if (error.response && error.response.data && error.response.data.errors) {
@@ -1393,7 +1426,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                       client.startMed,
                       client.endHour,
                       client.endMin,
-                      client.endMed
+                      client.endMed,
                     );
                     break;
                   case "2":
@@ -1406,7 +1439,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                       global.startMed,
                       global.endHour,
                       global.endMin,
-                      global.endMed
+                      global.endMed,
                     );
                     break;
                 }
@@ -1432,7 +1465,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                               client.room,
                               settings.bridge.ip,
                               settings.bridge.user,
-                              client.transition
+                              client.transition,
                             );
                           }
                           if (client.transitionType == "1") {
@@ -1441,7 +1474,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                 client.room,
                                 settings.bridge.ip,
                                 settings.bridge.user,
-                                parseFloat(client.transition) * 1000
+                                parseFloat(client.transition) * 1000,
                               );
                               console.info("Play trigger has turned off lights");
                             } else {
@@ -1449,7 +1482,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                 client.play,
                                 parseFloat(client.transition) * 1000,
                                 settings.bridge.ip,
-                                settings.bridge.user
+                                settings.bridge.user,
                               );
                               console.info(`Play scene was recalled ${client.media} on ${client.client.name}`);
                             }
@@ -1459,7 +1492,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                 client.room,
                                 settings.bridge.ip,
                                 settings.bridge.user,
-                                parseFloat(global.transition) * 1000
+                                parseFloat(global.transition) * 1000,
                               );
                               console.info("Play trigger has turned off lights");
                             } else {
@@ -1467,7 +1500,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                 client.play,
                                 parseFloat(global.transition) * 1000,
                                 settings.bridge.ip,
-                                settings.bridge.user
+                                settings.bridge.user,
                               );
                               console.info(`Play scene was recalled ${client.media} on ${client.client.name}`);
                             }
@@ -1475,13 +1508,13 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                         }
                         if (payload.event === "media.stop" && client.stop !== "None") {
                           isPaused = false;
-                          if (client.transitionType == "1") {
+                          if (client.transitionType === "1") {
                             if (client.stop === "Off") {
                               turnoffGroup(
                                 client.room,
                                 settings.bridge.ip,
                                 settings.bridge.user,
-                                parseFloat(client.transition) * 1000
+                                parseFloat(client.transition) * 1000,
                               );
                               console.info("Stop trigger has turned off lights");
                             } else {
@@ -1490,25 +1523,33 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                   client.room,
                                   parseFloat(client.transition) * 1000,
                                   settings.bridge.ip,
-                                  settings.bridge.user
+                                  settings.bridge.user,
                                 );
                               } else {
                                 setScene(
                                   client.stop,
                                   parseFloat(client.transition) * 1000,
                                   settings.bridge.ip,
-                                  settings.bridge.user
+                                  settings.bridge.user,
                                 );
                               }
-                              console.info(`Stop scene was recalled ${client.media} on ${client.client.name}`);
                             }
+                            if (client.pause === "-2" && client.stop !== "-2") {
+                              await deleteScene(
+                                client.room,
+                                parseFloat(client.transition) * 1000,
+                                settings.bridge.ip,
+                                settings.bridge.user,
+                              );
+                            }
+                            console.info(`Stop scene was recalled ${client.media} on ${client.client.name}`);
                           } else {
                             if (client.stop === "Off") {
                               turnoffGroup(
                                 client.room,
                                 settings.bridge.ip,
                                 settings.bridge.user,
-                                parseFloat(global.transition) * 1000
+                                parseFloat(global.transition) * 1000,
                               );
                               console.info("Stop trigger has turned off lights");
                             } else {
@@ -1517,14 +1558,22 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                   client.room,
                                   parseFloat(global.transition) * 1000,
                                   settings.bridge.ip,
-                                  settings.bridge.user
+                                  settings.bridge.user,
                                 );
                               } else {
                                 setScene(
                                   client.stop,
                                   parseFloat(global.transition) * 1000,
                                   settings.bridge.ip,
-                                  settings.bridge.user
+                                  settings.bridge.user,
+                                );
+                              }
+                              if (client.pause === "-2" && client.stop !== "-2") {
+                                await deleteScene(
+                                  client.room,
+                                  parseFloat(global.transition) * 1000,
+                                  settings.bridge.ip,
+                                  settings.bridge.user,
                                 );
                               }
                               console.info(`Stop scene was recalled ${client.media} on ${client.client.name}`);
@@ -1540,30 +1589,43 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                     client.room,
                                     settings.bridge.ip,
                                     settings.bridge.user,
-                                    parseFloat(client.transition) * 1000
+                                    parseFloat(client.transition) * 1000,
                                   );
                                   console.info("Pause trigger has turned off lights");
                                 } else {
                                   if (client.pause === "-2") {
                                     const roomId = playStorage.find((room) => room.room === client.room);
-
-                                    if (!roomId) {
-                                      console.warn(`[Restore] No scene found for room: ${client.room}`);
-                                      return;
+                                    if (roomId) {
+                                      setScene(
+                                        roomId.rid,
+                                        parseFloat(client.transition) * 1000,
+                                        settings.bridge.ip,
+                                        settings.bridge.user,
+                                      );
+                                    } else {
+                                      console.info("Recalling stored scene");
+                                      const result = await recallDanglingScene(
+                                        client.room,
+                                        settings.bridge.ip,
+                                        settings.bridge.user,
+                                      );
+                                      if (result.id) {
+                                        setScene(
+                                          result.id,
+                                          parseFloat(client.transition) * 1000,
+                                          settings.bridge.ip,
+                                          settings.bridge.user,
+                                        );
+                                      } else {
+                                        console.info("No stored scene found");
+                                      }
                                     }
-
-                                    setScene(
-                                      roomId.rid,
-                                      parseFloat(client.transition) * 1000,
-                                      settings.bridge.ip,
-                                      settings.bridge.user
-                                    );
                                   } else {
                                     setScene(
                                       client.pause,
                                       parseFloat(client.transition) * 1000,
                                       settings.bridge.ip,
-                                      settings.bridge.user
+                                      settings.bridge.user,
                                     );
                                   }
                                   console.info(`Pause scene was recalled ${client.media} on ${client.client.name}`);
@@ -1574,30 +1636,43 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                     client.room,
                                     settings.bridge.ip,
                                     settings.bridge.user,
-                                    parseFloat(global.transition) * 1000
+                                    parseFloat(global.transition) * 1000,
                                   );
                                   console.info("Pause trigger has turned off lights");
                                 } else {
                                   if (client.pause === "-2") {
                                     const roomId = playStorage.find((room) => room.room === client.room);
-
-                                    if (!roomId) {
-                                      console.warn(`[Restore] No scene found for room: ${client.room}`);
-                                      return;
+                                    if (roomId) {
+                                      setScene(
+                                        roomId.rid,
+                                        parseFloat(client.transition) * 1000,
+                                        settings.bridge.ip,
+                                        settings.bridge.user,
+                                      );
+                                    } else {
+                                      console.info("Recalling stored scene");
+                                      const result = await recallDanglingScene(
+                                        client.room,
+                                        settings.bridge.ip,
+                                        settings.bridge.user,
+                                      );
+                                      if (result.id) {
+                                        setScene(
+                                          result.id,
+                                          parseFloat(client.transition) * 1000,
+                                          settings.bridge.ip,
+                                          settings.bridge.user,
+                                        );
+                                      } else {
+                                        console.info("No stored scene found");
+                                      }
                                     }
-
-                                    setScene(
-                                      roomId.rid,
-                                      parseFloat(global.transition) * 1000,
-                                      settings.bridge.ip,
-                                      settings.bridge.user
-                                    );
                                   } else {
                                     setScene(
                                       client.pause,
-                                      parseFloat(global.transition) * 1000,
+                                      parseFloat(client.transition) * 1000,
                                       settings.bridge.ip,
-                                      settings.bridge.user
+                                      settings.bridge.user,
                                     );
                                   }
                                   console.info(`Pause scene was recalled ${client.media} on ${client.client.name}`);
@@ -1623,7 +1698,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                 client.room,
                                 settings.bridge.ip,
                                 settings.bridge.user,
-                                parseFloat(client.transition) * 1000
+                                parseFloat(client.transition) * 1000,
                               );
                               console.info("Resume trigger has turned off lights");
                             } else {
@@ -1631,7 +1706,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                 client.resume,
                                 parseFloat(client.transition) * 1000,
                                 settings.bridge.ip,
-                                settings.bridge.user
+                                settings.bridge.user,
                               );
                               console.info(`Resume scene was recalled ${client.media} on ${client.client.name}`);
                             }
@@ -1641,7 +1716,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                 client.room,
                                 settings.bridge.ip,
                                 settings.bridge.user,
-                                parseFloat(global.transition) * 1000
+                                parseFloat(global.transition) * 1000,
                               );
                               console.info("Resume trigger has turned off lights");
                             } else {
@@ -1649,7 +1724,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                 client.resume,
                                 parseFloat(global.transition) * 1000,
                                 settings.bridge.ip,
-                                settings.bridge.user
+                                settings.bridge.user,
                               );
                               console.info(`Resume scene was recalled ${client.media} on ${client.client.name}`);
                             }
@@ -1663,7 +1738,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                   client.room,
                                   settings.bridge.ip,
                                   settings.bridge.user,
-                                  parseFloat(client.transition) * 1000
+                                  parseFloat(client.transition) * 1000,
                                 );
                                 console.info("Scrobble trigger has turned off lights");
                               } else {
@@ -1671,7 +1746,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                   client.scrobble,
                                   parseFloat(client.transition) * 1000,
                                   settings.bridge.ip,
-                                  settings.bridge.user
+                                  settings.bridge.user,
                                 );
                                 console.info(`Scrobble scene was recalled ${client.media} on ${client.client.name}`);
                               }
@@ -1681,7 +1756,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                   client.room,
                                   settings.bridge.ip,
                                   settings.bridge.user,
-                                  parseFloat(global.transition) * 1000
+                                  parseFloat(global.transition) * 1000,
                                 );
                                 console.info("Scrobble trigger has turned off lights");
                               } else {
@@ -1689,7 +1764,7 @@ router.post("/", upload.single("thumb"), async function (req, res, next) {
                                   client.scrobble,
                                   parseFloat(global.transition) * 1000,
                                   settings.bridge.ip,
-                                  settings.bridge.user
+                                  settings.bridge.user,
                                 );
                                 console.info(`Scrobble scene was recalled ${client.media} on ${client.client.name}`);
                               }

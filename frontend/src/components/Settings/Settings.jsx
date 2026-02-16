@@ -6,7 +6,6 @@ import Tooltip from "react-bootstrap/Tooltip";
 import Info from "bootstrap-icons/icons/info-circle.svg";
 import Button from "react-bootstrap/Button";
 import Stack from "react-bootstrap/Stack";
-import Image from "react-bootstrap/Image";
 import "./Settings.css";
 
 export default class Settings extends Component {
@@ -115,6 +114,8 @@ export default class Settings extends Component {
       case "endMed":
         this.setState({ endMed: e.target.value.toString() });
         break;
+      default:
+        break;
     }
     this.setState({ isSaved: false });
   };
@@ -137,7 +138,7 @@ export default class Settings extends Component {
       options.push(
         <option value={i.toString()}>
           {i.toLocaleString("en-US", { minimumIntegerDigits: 2, useGrouping: false })}
-        </option>
+        </option>,
       );
     }
     return (
@@ -156,7 +157,7 @@ export default class Settings extends Component {
                   <Tooltip>These settings will be applied toward profile settings that are set as "global".</Tooltip>
                 }
               >
-                <img src={Info} className="image-info" />
+                <img src={Info} className="image-info" alt="" />
               </OverlayTrigger>
             </h5>
             <div className="div-seperator" />
@@ -179,7 +180,7 @@ export default class Settings extends Component {
                   </Tooltip>
                 }
               >
-                <img src={Info} className="image-info" alt="Info" />
+                <img src={Info} className="image-info" alt="" />
               </OverlayTrigger>
             </Form.Label>
             <Stack gap={1} direction="horizontal">
@@ -323,7 +324,7 @@ export default class Settings extends Component {
             </h5>
             <div className="div-seperator" />
             1. Visit{" "}
-            <a href="https://www.latlong.net/" target="_blank">
+            <a href="https://www.latlong.net/" target="_blank" rel="noreferrer">
               LatLong.net
             </a>
             <br />
